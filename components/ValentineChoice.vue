@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import { launchConfetti } from '~/utils/confetti'
+
 const emit = defineEmits<{
   confirmed: []
 }>()
 
-const neinRef = ref<HTMLButtonElement | null>(null)
 const containerRef = ref<HTMLDivElement | null>(null)
+const confettiCanvas = ref<HTMLCanvasElement | null>(null)
 const neinOffset = ref({ x: 0, y: 0 })
 const evadeCount = ref(0)
 const confirmed = ref(false)
+const entered = ref(false)
+let stopConfetti: (() => void) | null = null
 
 function evadeNein() {
   if (!containerRef.value) return
@@ -28,8 +32,18 @@ function evadeNein() {
 
 function onJa() {
   confirmed.value = true
-  setTimeout(() => emit('confirmed'), 800)
+  // Launch confetti after next tick (canvas needs to mount)
+  nextTick(() => {
+    if (confettiCanvas.value) {
+      stopConfetti = launchConfetti(confettiCanvas.value, 2200)
+    }
+  })
+  setTimeout(() => emit('confirmed'), 2800)
 }
+
+onUnmounted(() => {
+  stopConfetti?.()
+})
 
 // Desktop: evade on hover
 function onNeinHover() {
@@ -41,6 +55,13 @@ function onNeinTouch(e: TouchEvent) {
   e.preventDefault()
   evadeNein()
 }
+
+onMounted(() => {
+  // Smooth entrance: delay before elements become interactive
+  requestAnimationFrame(() => {
+    entered.value = true
+  })
+})
 </script>
 
 <template>
@@ -55,14 +76,25 @@ function onNeinTouch(e: TouchEvent) {
     />
     <div class="absolute inset-0 bg-gradient-to-b from-black/50 via-black/35 to-black/55" />
 
-    <div class="relative z-10 flex flex-col items-center gap-8 px-6 max-w-[38rem] text-center">
+    <div
+      class="relative z-10 flex flex-col items-center gap-8 px-6 max-w-[38rem] text-center transition-all duration-700 ease-out"
+      :class="entered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
+    >
       <h1 class="font-serif text-3xl md:text-5xl tracking-tight text-white">
         Möchtest du mein Valentin sein?
       </h1>
 
-      <!-- Confirmed state: hearts -->
-      <div v-if="confirmed" class="text-6xl animate-bounce">
-        ❤️
+      <!-- Confirmed state: confetti handled by parent, show heart -->
+      <div
+        v-if="confirmed"
+        class="flex flex-col items-center gap-4"
+      >
+        <div class="text-7xl heart-pop">
+          ❤️
+        </div>
+        <p class="font-sans text-lg text-white/80 animate-fade-in">
+          Das wusste ich doch!
+        </p>
       </div>
 
       <!-- Buttons -->
@@ -75,7 +107,6 @@ function onNeinTouch(e: TouchEvent) {
         </button>
 
         <button
-          ref="neinRef"
           class="px-8 py-3 rounded-full bg-white/20 text-white border border-white/40 font-sans font-semibold text-lg backdrop-blur-sm transition-all duration-200 z-10"
           :style="{
             transform: `translate(${neinOffset.x}px, ${neinOffset.y}px)`,
@@ -87,5 +118,33 @@ function onNeinTouch(e: TouchEvent) {
         </button>
       </div>
     </div>
+
+    <!-- Confetti canvas -->
+    <canvas
+      v-if="confirmed"
+      ref="confettiCanvas"
+      class="absolute inset-0 pointer-events-none z-20"
+    />
   </div>
 </template>
+
+<style scoped>
+.heart-pop {
+  animation: heartPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes heartPop {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out 0.3s both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

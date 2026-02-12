@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { getLevelConfig } from '~/utils/levels'
-import { sendWebhook, generateSessionId } from '~/utils/webhook'
+import { getHint } from '~/utils/hints'
+import type { Hint } from '~/utils/hints'
+
+const props = defineProps<{
+  collectedHints: Hint[]
+}>()
 
 const emit = defineEmits<{
+  levelComplete: [level: number]
   gameEnd: []
 }>()
 
-const config = useRuntimeConfig()
-const webhookUrl = config.public.n8nWebhookUrl as string
-
 const threeCanvas = ref<InstanceType<typeof import('./ThreeCanvas.vue').default> | null>(null)
 
-const sessionId = generateSessionId()
-const level = ref(1)
+const level = ref(props.collectedHints.length + 1)
 const clickCount = ref(0)
 const timeLeft = ref(0)
 const gameState = ref<'countdown' | 'playing' | 'levelComplete' | 'gameOver'>('countdown')
@@ -56,21 +58,20 @@ function endLevel(success: boolean) {
     timerInterval = null
   }
 
-  // Send webhook
-  sendWebhook(webhookUrl, {
-    level: level.value,
-    success,
-    clickCount: clickCount.value,
-    timeLimit: levelConfig.value.timeLimit,
-    sessionId,
-    timestamp: new Date().toISOString(),
-  })
-
   if (success) {
     gameState.value = 'levelComplete'
+    const completedLevel = level.value
+    const hasHint = getHint(completedLevel) !== null
+
     setTimeout(() => {
-      level.value++
-      startCountdown()
+      if (hasHint) {
+        // Emit to parent to show hint, parent will re-mount us for next level
+        emit('levelComplete', completedLevel)
+      } else {
+        // No more hints, just advance
+        level.value++
+        startCountdown()
+      }
     }, 1500)
   } else {
     gameState.value = 'gameOver'
@@ -87,13 +88,11 @@ function onPunch() {
   clickCount.value++
   threeCanvas.value?.punch(1.0)
 
-  // Check win condition
   if (clickCount.value >= levelConfig.value.requiredClicks) {
     endLevel(true)
   }
 }
 
-// Input handlers
 function onMouseDown(e: MouseEvent) {
   e.preventDefault()
   onPunch()
@@ -146,9 +145,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!-- Level indicator -->
-      <div class="absolute top-4 left-1/2 -translate-x-1/2">
-        <div class="bg-black/40 backdrop-blur-sm rounded-2xl px-4 py-2 text-white font-sans text-sm md:text-base font-semibold">
+      <!-- Level indicator (animates from center to HUD) -->
+      <div
+        class="level-indicator absolute left-1/2 text-white font-sans font-semibold"
+        :class="gameState === 'countdown' ? 'level-indicator--center' : 'level-indicator--hud'"
+      >
+        <div class="bg-black/40 backdrop-blur-sm rounded-2xl px-4 py-2 whitespace-nowrap">
           Level {{ level }}
         </div>
       </div>
@@ -158,9 +160,13 @@ onUnmounted(() => {
         v-if="gameState === 'countdown'"
         class="absolute inset-0 flex items-center justify-center"
       >
-        <span class="text-white font-serif text-8xl md:text-9xl animate-pulse">
-          {{ countdownNumber > 0 ? countdownNumber : 'Los!' }}
-        </span>
+        <div class="flex flex-col items-center gap-4">
+          <!-- spacer so countdown sits below the level label -->
+          <div class="h-10" />
+          <span class="text-white font-serif text-8xl md:text-9xl animate-pulse">
+            {{ countdownNumber > 0 ? countdownNumber : 'Los!' }}
+          </span>
+        </div>
       </div>
 
       <!-- Level complete overlay -->
@@ -187,3 +193,37 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.level-indicator {
+  transition: top 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+              transform 0.7s cubic-bezier(0.25, 0.1, 0.25, 1),
+              font-size 0.7s cubic-bezier(0.25, 0.1, 0.25, 1);
+  z-index: 10;
+}
+
+.level-indicator--center {
+  top: calc(50% - 60px);
+  transform: translateX(-50%) translateY(-50%);
+  font-size: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .level-indicator--center {
+    font-size: 1.875rem;
+  }
+}
+
+.level-indicator--hud {
+  top: 1rem;
+  transform: translateX(-50%);
+  font-size: 0.875rem;
+}
+
+@media (min-width: 768px) {
+  .level-indicator--hud {
+    top: 1.5rem;
+    font-size: 1rem;
+  }
+}
+</style>

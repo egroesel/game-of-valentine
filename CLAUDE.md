@@ -20,7 +20,7 @@ Specifications:
 - **Language:** TypeScript
 - **3D Graphics:** Three.js (client-side only)
 - **Styling:** Tailwind CSS
-- **External:** n8n Webhook → Telegram
+- **Confetti:** Canvas-based particle system (`utils/confetti.ts`)
 
 ## Commands
 
@@ -36,30 +36,33 @@ npm run lint:fix   # Auto-fix lint issues
 
 ### Screen Flow (State Machine)
 
-The app progresses through screens linearly:
+The app progresses through screens managed in `app.vue`:
 
-1. **IntroOverlay** — Animated text sequence over background image (`/public/img/us.jpg`)
-2. **ValentineChoice** — "Möchtest du mein Valentin sein?" with evasive "Nein" button
+1. **IntroOverlay** — Animated text sequence + valentine question with evasive "Nö" button, confetti on confirm
+2. **GameExplanation** — Rules and instructions before the game starts
 3. **BoxingGame** — Click-based reflex game with Three.js scene + HUD overlay
-4. **Webhook events** — POST to `NUXT_PUBLIC_N8N_WEBHOOK_URL` after each level/game-over
+4. **HintOverlay** — Hint reveal after each completed level (hints defined in `utils/hints.ts`)
+5. **End screen** — Collected hints summary + restart button
+
+**Dev shortcut:** `Shift+Cmd+T` skips directly to Level 1 (BoxingGame) from any screen.
 
 ### Intro State Machine
 
 ```ts
-type IntroPhase = 'linesIn' | 'linesHold' | 'linesOut' | 'pause' | 'question' | 'buttons' | 'choiceActive'
+type IntroPhase = 'linesIn' | 'linesHold' | 'linesOut' | 'pause' | 'question' | 'choiceActive' | 'confirmed'
 ```
 
-Transitions are deterministic with specific timing values defined in [docs/spec-intro.md](docs/spec-intro.md).
+Transitions are deterministic with specific timing constants defined in `IntroOverlay.vue`. Valentine question + buttons are integrated directly into IntroOverlay (no separate ValentineChoice screen).
 
 ### Key Component Responsibilities
 
-- **`BoxingGame.vue`** — Game state (level, timer, clicks), HUD, webhook calls
+- **`BoxingGame.vue`** — Game state (level, timer, clicks), HUD, animated level indicator
 - **`ThreeCanvas.vue`** — WebGL renderer, camera, resize handling, game loop. Exposes: `punch()`, `setIntensity()`, `setGameOver()`
 - **`useThreeBoxingScene.ts`** — Scene objects, materials, animation system, impact FX
 
 ### Data Flow
 
-Input (click/touch) → `BoxingGame` increments counter + calls `three.punch(strength)` → Timer tick updates HUD → Level end triggers webhook → UI transition to next level
+Input (click/touch) → `BoxingGame` increments counter + calls `three.punch(strength)` → Timer tick updates HUD → Level end shows hint (via `HintOverlay`) → UI transition to next level
 
 ### Three.js Scene
 
@@ -69,12 +72,6 @@ Input (click/touch) → `BoxingGame` increments counter + calls `three.punch(str
 - Procedural punch animation: 0.12s forward (easeOutCubic) + 0.18s return (easeOutBack)
 - Level progression: strength multiplier `1 + level*0.08` (capped at 1.35), level 5+ intentionally unbeatable
 
-### Environment Variables
-
-```
-NUXT_PUBLIC_N8N_WEBHOOK_URL=<n8n webhook endpoint>
-```
-
 ### Assets
 
 Required in `/public/`:
@@ -83,9 +80,7 @@ Required in `/public/`:
 
 Optional:
 - `models/glove.glb` — Boxing glove 3D model
-- `img/hit_flash.png` — Impact flash sprite
-
-All assets have coded fallbacks (solid color materials, primitive geometry).
+All assets have coded fallbacks (solid color materials, primitive geometry, runtime canvas textures).
 
 ## Design Conventions
 

@@ -36,9 +36,9 @@ export function useThreeBoxingScene() {
   const PUNCH_COOLDOWN = 80
 
   // Glove positions
-  const gloveRestPos = new THREE.Vector3(0.8, 1.05, 1.2)
-  const gloveRestRot = new THREE.Euler(0, -0.4, 0)
-  const punchDir = new THREE.Vector3(-0.55, 0, -0.85).normalize()
+  const gloveRestPos = new THREE.Vector3(0.55, 1.05, 1.2)
+  const gloveRestRot = new THREE.Euler(Math.PI / 4, -0.6, 0)
+  const punchDir = new THREE.Vector3(-0.30, 0, -0.85).normalize()
 
   // Camera shake
   const cameraBasePos = new THREE.Vector3(0.0, 1.4, 4.2)
@@ -68,28 +68,36 @@ export function useThreeBoxingScene() {
     camera.position.copy(cameraBasePos)
     camera.lookAt(0, 1.1, 0)
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0xffffff, 0.45)
+    // Lights – gym atmosphere with warm overhead + cool fill
+    const ambient = new THREE.AmbientLight(0x404050, 0.4)
     scene.add(ambient)
 
-    directionalLight = new THREE.DirectionalLight(0xffffff, 1.1)
-    directionalLight.position.set(2.5, 4, 2.5)
+    directionalLight = new THREE.DirectionalLight(0xffe8c0, 1.3)
+    directionalLight.position.set(2, 5, 3)
     scene.add(directionalLight)
 
-    const point = new THREE.PointLight(0xffffff, 0.6)
-    point.position.set(-2, 2, 2)
-    scene.add(point)
+    const fillLight = new THREE.PointLight(0x8090b0, 0.5)
+    fillLight.position.set(-3, 2.5, 2)
+    scene.add(fillLight)
 
-    // Floor
-    const floorGeo = new THREE.PlaneGeometry(10, 10)
-    const floorMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9 })
-    const floor = new THREE.Mesh(floorGeo, floorMat)
-    floor.rotation.x = -Math.PI / 2
-    floor.position.y = 0
-    scene.add(floor)
+    // Overhead gym lights (warm hanging lamps)
+    const lamp1 = new THREE.PointLight(0xffcc77, 0.8, 8)
+    lamp1.position.set(0, 3.8, 0)
+    scene.add(lamp1)
 
-    // Fog
-    scene.fog = new THREE.Fog(0x000000, 5, 12)
+    const lamp2 = new THREE.PointLight(0xffcc77, 0.4, 6)
+    lamp2.position.set(-3, 3.8, -2)
+    scene.add(lamp2)
+
+    const lamp3 = new THREE.PointLight(0xffcc77, 0.4, 6)
+    lamp3.position.set(3, 3.8, -2)
+    scene.add(lamp3)
+
+    // Boxing hall environment
+    createGymEnvironment()
+
+    // Fog – subtle depth
+    scene.fog = new THREE.Fog(0x0a0a12, 6, 16)
 
     // Punching bag
     createBag()
@@ -105,6 +113,114 @@ export function useThreeBoxingScene() {
 
     // Start render loop
     animate()
+  }
+
+  function createGymEnvironment() {
+    if (!scene) return
+
+    // --- Floor: dark wood planks ---
+    const floorGeo = new THREE.PlaneGeometry(14, 14)
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x2a1f16,
+      roughness: 0.85,
+      metalness: 0.0,
+    })
+    const floor = new THREE.Mesh(floorGeo, floorMat)
+    floor.rotation.x = -Math.PI / 2
+    floor.position.y = 0
+    scene.add(floor)
+
+    const wallColor = 0x1a1520
+    const wallMat = new THREE.MeshStandardMaterial({
+      color: wallColor,
+      roughness: 0.95,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+    })
+
+    // --- Back wall ---
+    const backWallGeo = new THREE.PlaneGeometry(14, 5)
+    const backWall = new THREE.Mesh(backWallGeo, wallMat)
+    backWall.position.set(0, 2.5, -5)
+    scene.add(backWall)
+
+    // --- Side walls ---
+    const sideWallGeo = new THREE.PlaneGeometry(10, 5)
+    const leftWall = new THREE.Mesh(sideWallGeo, wallMat.clone())
+    leftWall.position.set(-7, 2.5, 0)
+    leftWall.rotation.y = Math.PI / 2
+    scene.add(leftWall)
+
+    const rightWall = new THREE.Mesh(sideWallGeo, wallMat.clone())
+    rightWall.position.set(7, 2.5, 0)
+    rightWall.rotation.y = -Math.PI / 2
+    scene.add(rightWall)
+
+    // --- Ceiling ---
+    const ceilingGeo = new THREE.PlaneGeometry(14, 10)
+    const ceilingMat = new THREE.MeshStandardMaterial({
+      color: 0x121018,
+      roughness: 0.95,
+      side: THREE.DoubleSide,
+    })
+    const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat)
+    ceiling.rotation.x = Math.PI / 2
+    ceiling.position.y = 4
+    scene.add(ceiling)
+
+    // --- Hanging lamp fixtures (visual) ---
+    const lampGeo = new THREE.CylinderGeometry(0.15, 0.25, 0.1, 16)
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.8, roughness: 0.3 })
+    const lampPositions = [[0, 3.95, 0], [-3, 3.95, -2], [3, 3.95, -2]]
+    for (const [x, y, z] of lampPositions) {
+      const lampShade = new THREE.Mesh(lampGeo, lampMat)
+      lampShade.position.set(x, y, z)
+      scene.add(lampShade)
+
+      // Wire
+      const wireGeo = new THREE.CylinderGeometry(0.008, 0.008, 0.15, 4)
+      const wireMat = new THREE.MeshStandardMaterial({ color: 0x444444 })
+      const wire = new THREE.Mesh(wireGeo, wireMat)
+      wire.position.set(x, 4.07, z)
+      scene.add(wire)
+    }
+
+    // --- Ceiling beam (horizontal bar where bag hangs) ---
+    const beamGeo = new THREE.BoxGeometry(3, 0.12, 0.12)
+    const beamMat = new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.4 })
+    const beam = new THREE.Mesh(beamGeo, beamMat)
+    beam.position.set(0, 3.9, 0)
+    scene.add(beam)
+
+    // --- Back wall accent: horizontal stripe ---
+    const stripeGeo = new THREE.PlaneGeometry(13.8, 0.15)
+    const stripeMat = new THREE.MeshStandardMaterial({
+      color: 0xcc2222,
+      roughness: 0.5,
+      emissive: 0x330808,
+    })
+    const stripe = new THREE.Mesh(stripeGeo, stripeMat)
+    stripe.position.set(0, 1.5, -4.98)
+    scene.add(stripe)
+
+    // --- Ropes along back wall (gym vibe) ---
+    const ropeMat = new THREE.MeshStandardMaterial({ color: 0xcc8833, roughness: 0.7 })
+    for (let i = 0; i < 3; i++) {
+      const ropeGeo = new THREE.CylinderGeometry(0.015, 0.015, 8, 8)
+      const rope = new THREE.Mesh(ropeGeo, ropeMat)
+      rope.rotation.z = Math.PI / 2
+      rope.position.set(0, 0.8 + i * 0.4, -4.9)
+      scene.add(rope)
+    }
+
+    // --- Rope posts ---
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x444444, metalness: 0.6, roughness: 0.4 })
+    const postGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.8, 8)
+    for (const x of [-4, 4]) {
+      const post = new THREE.Mesh(postGeo, postMat)
+      post.position.set(x, 0.9, -4.9)
+      scene.add(post)
+    }
   }
 
   function createBag() {
@@ -125,7 +241,7 @@ export function useThreeBoxingScene() {
       (texture) => {
         texture.wrapS = THREE.RepeatWrapping
         texture.wrapT = THREE.RepeatWrapping
-        texture.repeat.set(2.2, 1.2)
+        texture.repeat.set(4.5, 2.5)
         mat.map = texture
         mat.needsUpdate = true
       },
@@ -139,12 +255,19 @@ export function useThreeBoxingScene() {
     bag.position.set(0, 1.05, 0)
     scene.add(bag)
 
-    // Chain (cosmetic)
-    const chainGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.8, 8)
+    // Chain from bag to ceiling beam
+    const chainGeo = new THREE.CylinderGeometry(0.02, 0.02, 2.0, 8)
     const chainMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.8, roughness: 0.3 })
     const chain = new THREE.Mesh(chainGeo, chainMat)
-    chain.position.set(0, 2.3, 0)
+    chain.position.set(0, 2.9, 0)
     scene.add(chain)
+
+    // Mounting plate
+    const mountGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.04, 16)
+    const mountMat = new THREE.MeshStandardMaterial({ color: 0x666666, metalness: 0.9, roughness: 0.2 })
+    const mount = new THREE.Mesh(mountGeo, mountMat)
+    mount.position.set(0, 1.92, 0)
+    scene.add(mount)
   }
 
   function createGlove() {
@@ -192,25 +315,28 @@ export function useThreeBoxingScene() {
   function createHitFlash() {
     if (!scene) return
 
-    const textureLoader = new THREE.TextureLoader()
+    // Generate radial gradient texture at runtime
+    const size = 128
+    const canvas2d = document.createElement('canvas')
+    canvas2d.width = size
+    canvas2d.height = size
+    const ctx = canvas2d.getContext('2d')!
+    const gradient = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+    gradient.addColorStop(0, 'rgba(255,255,200,1)')
+    gradient.addColorStop(0.3, 'rgba(255,220,100,0.8)')
+    gradient.addColorStop(1, 'rgba(255,180,50,0)')
+    ctx.fillStyle = gradient
+    ctx.fillRect(0, 0, size, size)
+
+    const texture = new THREE.CanvasTexture(canvas2d)
+
     const spriteMat = new THREE.SpriteMaterial({
-      color: 0xffffaa,
+      map: texture,
       transparent: true,
       opacity: 0,
       blending: THREE.AdditiveBlending,
+      depthWrite: false,
     })
-
-    textureLoader.load(
-      '/img/hit_flash.png',
-      (texture) => {
-        spriteMat.map = texture
-        spriteMat.needsUpdate = true
-      },
-      undefined,
-      () => {
-        // No texture fallback: plain colored sprite
-      },
-    )
 
     hitFlash = new THREE.Sprite(spriteMat)
     hitFlash.scale.set(0, 0, 0)
