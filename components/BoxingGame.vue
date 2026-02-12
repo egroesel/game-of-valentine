@@ -2,6 +2,7 @@
 import { getLevelConfig } from '~/utils/levels'
 import { getHint } from '~/utils/hints'
 import type { Hint } from '~/utils/hints'
+import { playPunch, playCountdownBeep, playGo, playLevelComplete, playGameOver } from '~/utils/audio'
 
 const props = defineProps<{
   collectedHints: Hint[]
@@ -28,11 +29,15 @@ const formattedTime = computed(() => timeLeft.value.toFixed(1))
 function startCountdown() {
   gameState.value = 'countdown'
   countdownNumber.value = 3
+  playCountdownBeep()
   const countInterval = setInterval(() => {
     countdownNumber.value--
     if (countdownNumber.value <= 0) {
       clearInterval(countInterval)
+      playGo()
       startLevel()
+    } else {
+      playCountdownBeep()
     }
   }, 800)
 }
@@ -59,6 +64,7 @@ function endLevel(success: boolean) {
   }
 
   if (success) {
+    playLevelComplete()
     gameState.value = 'levelComplete'
     const completedLevel = level.value
     const hasHint = getHint(completedLevel) !== null
@@ -74,6 +80,7 @@ function endLevel(success: boolean) {
       }
     }, 1500)
   } else {
+    playGameOver()
     gameState.value = 'gameOver'
     threeCanvas.value?.setGameOver(true)
     setTimeout(() => {
@@ -86,6 +93,7 @@ function onPunch() {
   if (gameState.value !== 'playing') return
 
   clickCount.value++
+  playPunch()
   threeCanvas.value?.punch(1.0)
 
   if (clickCount.value >= levelConfig.value.requiredClicks) {

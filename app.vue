@@ -1,13 +1,38 @@
 <script setup lang="ts">
 import { getHint, type Hint } from '~/utils/hints'
+import { playMusic, fadeMusicVolume, setMusicVolume, getMusicVolume, destroyMusic } from '~/utils/music'
+import { setSfxVolume, getSfxVolume } from '~/utils/audio'
 
-type Screen = 'intro' | 'explanation' | 'boxing' | 'hint' | 'end'
+type Screen = 'gate' | 'intro' | 'explanation' | 'boxing' | 'hint' | 'end'
 
-const screen = ref<Screen>('intro')
+const screen = ref<Screen>('gate')
 const transitioning = ref(false)
 const currentHint = ref<Hint | null>(null)
 const collectedHints = ref<Hint[]>([])
 const endEntered = ref(false)
+const sfxVolume = ref(getSfxVolume())
+const musicVolume = ref(getMusicVolume())
+const showVolumeSlider = ref(false)
+const musicStarted = ref(false)
+
+function onSfxVolumeChange(e: Event) {
+  const v = parseFloat((e.target as HTMLInputElement).value)
+  sfxVolume.value = v
+  setSfxVolume(v)
+}
+
+function onMusicVolumeChange(e: Event) {
+  const v = parseFloat((e.target as HTMLInputElement).value)
+  musicVolume.value = v
+  setMusicVolume(v)
+}
+
+function onGateTap() {
+  if (screen.value !== 'gate') return
+  musicStarted.value = true
+  playMusic(2000) // fade in over 2s
+  screen.value = 'intro'
+}
 
 function transitionTo(target: Screen, delayMs = 600) {
   transitioning.value = true
@@ -22,6 +47,8 @@ function onIntroConfirmed() {
 }
 
 function onExplanationStart() {
+  // Fade music down for boxing
+  fadeMusicVolume(0.12, 1000)
   transitionTo('boxing')
 }
 
@@ -30,15 +57,21 @@ function onLevelComplete(level: number) {
   if (hint) {
     currentHint.value = hint
     collectedHints.value.push(hint)
+    // Bring music back up for hint screen
+    fadeMusicVolume(musicVolume.value, 600)
     screen.value = 'hint'
   }
 }
 
 function onHintContinue() {
+  // Fade down again for boxing
+  fadeMusicVolume(0.12, 600)
   screen.value = 'boxing'
 }
 
 function onGameEnd() {
+  // Bring music back up for end screen
+  fadeMusicVolume(musicVolume.value, 800)
   transitionTo('end', 400)
   setTimeout(() => {
     endEntered.value = true
@@ -49,6 +82,7 @@ function restart() {
   endEntered.value = false
   collectedHints.value = []
   currentHint.value = null
+  fadeMusicVolume(musicVolume.value, 600)
   transitionTo('intro')
 }
 
@@ -58,6 +92,11 @@ function skipToBoxing(e: KeyboardEvent) {
     endEntered.value = false
     collectedHints.value = []
     currentHint.value = null
+    if (!musicStarted.value) {
+      musicStarted.value = true
+      playMusic(300)
+    }
+    fadeMusicVolume(0.12, 300)
     screen.value = 'boxing'
   }
 }
@@ -68,6 +107,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('keydown', skipToBoxing)
+  destroyMusic()
 })
 </script>
 
@@ -78,6 +118,25 @@ onUnmounted(() => {
       class="fixed inset-0 z-[100] bg-black pointer-events-none transition-opacity duration-500"
       :class="transitioning ? 'opacity-100' : 'opacity-0'"
     />
+
+    <!-- Gate: tap to start (unlocks audio) -->
+    <div
+      v-if="screen === 'gate'"
+      class="fixed inset-0 z-50 flex items-center justify-center cursor-pointer"
+      @click="onGateTap"
+      @touchstart.prevent="onGateTap"
+    >
+      <div
+        class="absolute inset-0 bg-cover bg-center"
+        :style="{ backgroundImage: 'url(/img/us.jpg)' }"
+      />
+      <div class="absolute inset-0 bg-black/95" />
+      <div class="relative z-10 text-center">
+        <p class="font-sans text-white/40 text-sm tracking-widest uppercase gate-pulse">
+          Tippe, um zu starten
+        </p>
+      </div>
+    </div>
 
     <IntroOverlay
       v-if="screen === 'intro'"
@@ -151,6 +210,47 @@ onUnmounted(() => {
         </button>
       </div>
     </div>
+
+    <!-- Volume controls (bottom-right) -->
+    <div class="fixed bottom-4 right-4 z-[90] flex items-center gap-2">
+      <!-- Volume sliders -->
+      <div
+        v-if="showVolumeSlider"
+        class="bg-black/60 backdrop-blur-sm rounded-2xl px-3 py-2 flex flex-col gap-2"
+      >
+        <div class="flex items-center gap-2">
+          <span class="text-white/50 text-xs w-6">🎵</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            :value="musicVolume"
+            class="w-20 h-1 accent-white cursor-pointer"
+            @input="onMusicVolumeChange"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-white/50 text-xs w-6">💥</span>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            :value="sfxVolume"
+            class="w-20 h-1 accent-white cursor-pointer"
+            @input="onSfxVolumeChange"
+          />
+        </div>
+      </div>
+      <!-- Volume button -->
+      <button
+        class="w-10 h-10 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center text-lg transition-transform hover:scale-110 active:scale-95"
+        @click="showVolumeSlider = !showVolumeSlider"
+      >
+        {{ sfxVolume > 0 || musicVolume > 0 ? '🔊' : '🔇' }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -159,5 +259,14 @@ body {
   margin: 0;
   overflow: hidden;
   background: #000;
+}
+
+.gate-pulse {
+  animation: gatePulse 2.5s ease-in-out infinite;
+}
+
+@keyframes gatePulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.7; }
 }
 </style>
