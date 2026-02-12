@@ -1,0 +1,24 @@
+{
+  "name": "game-of-valentine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "nuxt": "^3.17.0",
+    "three": "^0.172.0",
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@nuxtjs/tailwindcss": "^6.13.0",
+    "@nuxtjs/google-fonts": "^3.2.0",
+    "@types/three": "^0.172.0",
+    "typescript": "^5.7.0"
+  }
+}
