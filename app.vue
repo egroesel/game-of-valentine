@@ -130,7 +130,7 @@ onUnmounted(() => {
         class="absolute inset-0 bg-cover bg-center"
         :style="{ backgroundImage: 'url(/img/us.jpg)' }"
       />
-      <div class="absolute inset-0 bg-black/95" />
+      <div class="absolute inset-0 bg-black/85" />
       <div class="relative z-10 text-center">
         <p class="font-sans text-white/40 text-sm tracking-widest uppercase gate-pulse">
           Tippe, um zu starten
